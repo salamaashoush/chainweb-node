@@ -1,3 +1,24 @@
+## 2.30 (2025-07-07)
+This is a major version update. This release replaces all previous versions.
+
+Any prior version will stop working on **2025-07-23T00:00:00Z**. Node administrators must
+upgrade to this version before that date. The 2.30 feature upgrade will
+occur at block height 6027616 which is estimated to be mined at **2025-07-24T00:00:00Z**.
+
+### Changes
+- Upgrade to Pact 5.3 [`5c0d473`](https://github.com/kadena-io/chainweb-node/commit/5c0d473e347dbc2fc56827117de972ca89aed6f8)
+- Fix duplicate results from `keys` function [`498e3d8`](https://github.com/kadena-io/chainweb-node/commit/498e3d8d511e301d81989ec97eb9cb5f87c14fe6)
+
+## 2.29.1 (2025-06-17)
+This is a minor point release. Upgrading is **strongly recommended**.
+
+To upgrade, pull the latest docker image, or download the binary and
+restart the node with the same configuration file as before.
+
+### Changes
+- Unify Pact 5 command parsing between NewBlock and ValidateBlock [`055567d`](https://github.com/kadena-io/chainweb-node/commit/055567d00eef48d295cc35c510d1316e400073e8)
+- Add a test for malformed capability names [`9f0b409`](https://github.com/kadena-io/chainweb-node/commit/9f0b40936770e1a67ac45ecd81087ec2e66d09d7)
+
 ## 2.29 (2025-04-16)
 This is a major version update. This release replaces all previous versions.
 
