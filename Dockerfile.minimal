@@ -1,0 +1,165 @@
+# Ultra-minimal Dockerfile using distroless base
+# This provides the smallest possible image size with maximum security
+
+# ############################################################################ #
+# Parameters
+# ############################################################################ #
+
+ARG UBUNTU_VERSION=22.04
+ARG GHC_VERSION=9.8.2
+ARG PROJECT_NAME=chainweb
+
+# ############################################################################ #
+# Build Image
+# ############################################################################ #
+
+FROM ubuntu:${UBUNTU_VERSION} AS chainweb-build
+ARG GHC_VERSION
+ARG TARGETPLATFORM
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies in a single layer
+RUN <<EOF
+    apt-get update &&
+    apt-get install -y --no-install-recommends \
+      binutils \
+      build-essential \
+      ca-certificates \
+      curl \
+      git \
+      libbz2-dev \
+      libclang-dev \
+      libffi-dev \
+      libgflags-dev \
+      libgmp-dev \
+      liblz4-dev \
+      libmpfr-dev \
+      libncurses-dev \
+      libsnappy-dev \
+      libssl-dev \
+      libzstd-dev \
+      pkg-config \
+      zlib1g-dev \
+      locales \
+      $([ "${TARGETPLATFORM}" = "linux/arm64" ] && echo "libnuma-dev" || true) &&
+    # Generate locale
+    locale-gen en_US.UTF-8 &&
+    # Clean up in the same layer
+    apt-get autoremove -y &&
+    apt-get clean &&
+    rm -rf /var/lib/apt/lists/*
+EOF
+
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
+# Install Haskell toolchain
+ENV CABAL_DIR=/root/.cabal \
+    PATH=/root/.local/bin:/root/.ghcup/bin:$PATH \
+    BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+    BOOTSTRAP_HASKELL_MINIMAL=1 \
+    BOOTSTRAP_HASKELL_NO_UPGRADE=1 \
+    LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:${LD_LIBRARY_PATH:-}
+
+RUN --mount=type=cache,target=/root/.ghcup/cache,id=${TARGETPLATFORM} \
+    curl -sSf https://get-ghcup.haskell.org | sh && \
+    ghcup --cache install cabal latest && \
+    ghcup set cabal latest && \
+    ghcup --cache install ghc ${GHC_VERSION} && \
+    ghcup set ghc ${GHC_VERSION} && \
+    ghcup gc && \
+    rm -rf /root/.ghcup/logs/* /root/.ghcup/tmp/*
+
+RUN --mount=type=cache,target=/root/.cabal,id=${TARGETPLATFORM} \
+     cabal update
+
+# ############################################################################ #
+# Build Application
+# ############################################################################ #
+
+FROM chainweb-build AS chainweb-build-node
+ARG TARGETPLATFORM
+ARG PROJECT_NAME
+
+# Copy source files
+COPY cabal.project cabal.project.freeze chainweb.cabal ./
+COPY src/ src/
+COPY libs/ libs/
+COPY node/ node/
+COPY pact/ pact/
+COPY cwtools/ cwtools/
+COPY c/ c/
+COPY rewards/ rewards/
+COPY allocations/ allocations/
+COPY LICENSE ./
+COPY README.md ./
+COPY CHANGELOG.md ./
+
+# Build with maximum optimizations
+RUN --mount=type=cache,target=/root/.cabal,id=${TARGETPLATFORM} \
+    --mount=type=cache,target=./dist-newstyle,id=${PROJECT_NAME}-${TARGETPLATFORM},sharing=locked \
+    cabal build \
+    --ghc-options="-O2 -split-sections -optl-Wl,--gc-sections" \
+    chainweb-node:exe:chainweb-node
+
+# Extract, strip and compress binary
+RUN --mount=type=cache,target=/root/.cabal,id=${TARGETPLATFORM} \
+    --mount=type=cache,target=./dist-newstyle,id=${PROJECT_NAME}-${TARGETPLATFORM},sharing=locked \
+    mkdir -p /artifacts && \
+    cp $(cabal list-bin chainweb-node:exe:chainweb-node) /artifacts/chainweb-node && \
+    strip --strip-all /artifacts/chainweb-node && \
+    chmod +x /artifacts/chainweb-node
+
+
+FROM ubuntu:${UBUNTU_VERSION} AS chainweb-node
+ARG TARGETPLATFORM
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install only essential runtime dependencies
+RUN <<EOF
+    apt-get update &&
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      libbz2-1.0 \
+      libffi8 \
+      libgcc-s1 \
+      libgflags2.2 \
+      libgmp10 \
+      liblz4-1 \
+      libmpfr6 \
+      libncurses6 \
+      libsnappy1v5 \
+      libssl3 \
+      libstdc++6 \
+      libtinfo6 \
+      libzstd1 \
+      zlib1g \
+      bash \
+      curl &&
+    # Clean up to reduce layer size
+    apt-get autoremove -y &&
+    apt-get clean &&
+    rm -rf /var/lib/apt/lists/* \
+      /tmp/* \
+      /var/tmp/* \
+      /usr/share/doc/* \
+      /usr/share/man/* \
+      /usr/share/locale/* \
+      /var/cache/debconf/* \
+      /usr/share/info/* \
+      /usr/share/lintian/* \
+      /usr/share/common-licenses/*
+EOF
+
+
+# Copy the stripped binary
+COPY --from=chainweb-build-node /artifacts/chainweb-node /chainweb/chainweb-node
+RUN chmod +x /chainweb/chainweb-node
+
+
+WORKDIR /chainweb
+
+# Configure runtime
+EXPOSE 1848 1789
+
+ENTRYPOINT ["/chainweb/chainweb-node"]

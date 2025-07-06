@@ -1,0 +1,88 @@
+# Git directories and files
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Build artifacts and caches
+dist-newstyle/
+cabal.project.local*
+*.cabal~
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.p_hi
+*.p_o
+*.prof
+*.chi
+*.chs.h
+*.aux
+*.hp
+*.ps
+*.pdf
+*.log
+*.toc
+*.cp
+*.fn
+*.ky
+*.pg
+*.tp
+*.vr
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.figaro
+*.fls
+*.fdb_latexmk
+*.aux
+*.idx
+*.ind
+*.out
+
+# Stack artifacts
+.stack-work/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Documentation and non-essential files
+docs/
+
+# Development and testing files
+.envrc*
+test/golden/
+test/lib/
+test/unit/
+test/multinode/
+test/remote/
+test/pact/
+test/compaction/
+
+# Nix files (if not using Nix in Docker)
+*.nix
+flake.lock
+default.nix
+
+# Tools and scripts not needed for build
+tools/
+scripts/
+examples/
+rosetta/
+bench/
+changes/
+
+# Temporary files
+*.tmp
+*.temp
+.#*
